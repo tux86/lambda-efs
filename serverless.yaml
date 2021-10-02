@@ -1,0 +1,119 @@
+service: lambda-efs
+frameworkVersion: ^2.43
+useDotenv: true
+
+package:
+  individually: false
+  patterns:
+    - '!**/**'
+    - src/**
+
+
+plugins:
+  - serverless-webpack
+  - serverless-offline
+
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  region: ${opt:region, 'eu-west-1'}
+  profile: non-prod
+  lambdaHashingVersion: '20201221'
+  environment:
+    NODE_PATH: ./:/mnt/lambda/node_modules
+  vpc:
+    securityGroupIds:
+      - ${ssm:/${sls:stage}/sg/all_sg_id}
+    subnetIds:
+      - ${ssm:/${sls:stage}/vpc/subnet/private_a}
+      - ${ssm:/${sls:stage}/vpc/subnet/private_b}
+      - ${ssm:/${sls:stage}/vpc/subnet/database_a}
+      - ${ssm:/${sls:stage}/vpc/subnet/database_b}
+  iam:
+    role:
+      statements:
+        - Effect: 'Allow'
+          Action: '*'
+          Resource: '*'
+  httpApi:
+    cors: true
+    payload: '2.0'
+
+custom:
+  localMountPath: /mnt/lambda
+
+functions:
+  install:
+    handler: src/install.handler
+    events:
+      - httpApi:
+          path: /install
+          method: GET
+    fileSystemConfig:
+      arn: !GetAtt LambdaFSAccessPoint.Arn
+      localMountPath: ${self:custom.localMountPath}
+  testApi:
+    handler: src/handler.handler
+    events:
+      - httpApi:
+          path: /test
+          method: GET
+    fileSystemConfig:
+        arn: !GetAtt LambdaFSAccessPoint.Arn
+        localMountPath: ${self:custom.localMountPath}
+
+resources:
+  Resources:
+    # create efs file share
+    LambdaFileSystem:
+      Type: AWS::EFS::FileSystem
+      Properties:
+        FileSystemTags:
+          - Key: Name
+            Value: ${self:service}-${sls:stage}-fs
+        PerformanceMode: generalPurpose
+        Encrypted: false
+        BackupPolicy:
+          Status: DISABLED
+        FileSystemPolicy:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: '*'
+              Principal: '*'
+    # create efs mount target
+    LambdaFSMountTarget1:
+      Type: AWS::EFS::MountTarget
+      Properties:
+        FileSystemId: !Ref LambdaFileSystem
+        SubnetId: ${ssm:/${sls:stage}/vpc/subnet/private_a}
+        SecurityGroups:
+          - ${ssm:/${sls:stage}/sg/all_sg_id}
+    LambdaFSMountTarget2:
+      Type: AWS::EFS::MountTarget
+      Properties:
+        FileSystemId: !Ref LambdaFileSystem
+        SubnetId: ${ssm:/${sls:stage}/vpc/subnet/private_b}
+        SecurityGroups:
+          - ${ssm:/${sls:stage}/sg/all_sg_id}
+    # create access point resource
+    LambdaFSAccessPoint:
+      Type: AWS::EFS::AccessPoint
+      DependsOn:
+        - LambdaFSMountTarget1
+        - LambdaFSMountTarget2
+      Properties:
+        AccessPointTags:
+          - Key: Name
+            Value: ${self:service}-${sls:stage}-ap
+        FileSystemId: !Ref LambdaFileSystem
+        PosixUser:
+          Uid: '1000'
+          Gid: '1000'
+        RootDirectory:
+          CreationInfo:
+            OwnerGid: '1000'
+            OwnerUid: '1000'
+            Permissions: '0777'
+          Path: /

@@ -1,0 +1,54 @@
+{
+    "compilerOptions":
+    {
+        "experimentalDecorators": true,
+        "lib": [
+            "es2017",
+            "dom",
+            "dom.iterable",
+            "es2015.collection",
+            "es2015.iterable"
+        ],
+        "removeComments": true,
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false,
+        "emitDecoratorMetadata": true,
+        "sourceMap": true,
+        "allowSyntheticDefaultImports": true,
+        "forceConsistentCasingInFileNames": true,
+        "importHelpers": true,
+        "incremental": true,
+        "watch": true,
+        "target": "es2017",
+        "baseUrl": ".",
+        "plugins": [
+        {
+            "transform": "@zerollup/ts-transform-paths",
+            "exclude": [
+                "*"
+            ]
+        }],
+        "outDir": "dist"
+    },
+    "include": [
+        "./**/*.ts"
+    ],
+    "exclude": [
+        "node_modules/**/*",
+        ".serverless/**/*",
+        ".webpack/**/*",
+        "_warmup/**/*",
+        ".idea/**/*",
+        ".vscode/**/*",
+        "*.config.js",
+        "**/*.js"
+    ],
+    "ts-node":
+    {
+        "require": [
+            "tsconfig-paths/register"
+        ]
+    }
+}
